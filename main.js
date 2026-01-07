@@ -34,7 +34,8 @@ function copyLink(getemployees = true) {
 }
 
 function truncTo2(num, numDecimals = 2) {
-    return Number(num.toString().match(new RegExp("^\\d+(\\.\\d{0," + numDecimals + "})?"))[0]);
+    const match = num.toString().match(new RegExp("^\\d+(\\.\\d{0," + numDecimals + "})?"));
+    return Number(match ? match[0] : num);
 }
 
 function sortEmployeeList() {
