@@ -4,8 +4,18 @@
 //http://127.0.0.1:5500/?employees=[["mike","Pm","S",5,1000,80,100,100],["mike1","Pm","S",5,1000,80,100,100],["mike2","Pm","S",5,1000,80,100,100],["ryan","Pm","b",5],["max","Pm","b",5],["max1","Pm","b",5],["host1","Pm","h",3],["host2","Pm","h",4]]
 
 
+
+
 let employees = [];
 let jobTypes = { 'S': 'Server', 'B': 'Bartender', 'b': 'Barback', 'h': 'Host' }; // Server, Bartender, barback, Host
+
+
+window.onload = function () {
+    const params = new URLSearchParams(window.location.search);
+    employees = JSON.parse(LZString.decompressFromEncodedURIComponent(params.get("e")));
+}
+
+
 function copyLink(getemployees = true) {
     let tempEmployees = []
     for (emp of employees) {
@@ -16,8 +26,9 @@ function copyLink(getemployees = true) {
             return;
         }
     }
-    let allVars = '?employees=' + JSON.stringify(tempEmployees);
-    const link = window.location.href.replace('#', '').split('?')[0] + allVars; // Get the current page URL
+    let allVars = '?e=' + LZString.compressToEncodedURIComponent(JSON.stringify(tempEmployees));
+    const link = window.location.href.replace('#', '').split('?')[0] + allVars;
+
     navigator.clipboard.writeText(link).then(() => {
         const copyBtn = document.getElementById('shareBtn');
         const originalText = copyBtn.textContent;
@@ -194,8 +205,8 @@ function calculateTips() {
         emp.push(netSales);//emp[8]
         emp.push(cash);//emp[9] cash
         emp.push(cc);//emp[10] cc
-        emp.push(emp[6]-cc);//emp[11] server cc after barback cut
-        emp.push(emp[7]-cash);//emp[12] server cash after barback cut
+        emp.push(emp[6] - cc);//emp[11] server cc after barback cut
+        emp.push(emp[7] - cash);//emp[12] server cash after barback cut
         serverCCTipPool += emp[11];
         serverCashTipPool += emp[12];
         bbCashPool += cash;
