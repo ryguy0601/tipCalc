@@ -6,38 +6,25 @@
 
 let employees = [];
 let jobTypes = { 'S': 'Server', 'B': 'Bartender', 'b': 'Barback', 'h': 'Host' }; // Server, Bartender, barback, Host
-// function copyLink(getemployees = true) {
-//     let tempEmployees = []
-//     for (emp of employees) {
-//         tempEmployees.push(emp.slice(0, Math.min(emp.length, 8)));
-//     }
-//     if (getemployees) {
-//         if (!addEmployees()) {
-//             return;
-//         }
-//     }
-//     let allVars = '?employees=' + JSON.stringify(tempEmployees);
-//     const link = window.location.href.replace('#', '').split('?')[0] + allVars; // Get the current page URL
-//     navigator.clipboard.writeText(link).then(() => {
-//         alert('Link copied to clipboard!');
-//     }).catch(err => {
-//         console.error('Failed to copy: ', err);
-//     });
-// }
-function copyLink() {
-    let tempEmployees = [];
-    for (let emp of employees) {
+function copyLink(getemployees = true) {
+    let tempEmployees = []
+    for (emp of employees) {
         tempEmployees.push(emp.slice(0, Math.min(emp.length, 8)));
     }
+    if (getemployees) {
+        if (!addEmployees()) {
+            return;
+        }
+    }
     let allVars = '?employees=' + JSON.stringify(tempEmployees);
-    const link = window.location.href.replace('#', '').split('?')[0] + allVars;
-    
-    const phoneNumber = prompt('Enter contact phone number (with country code):');
-    if (!phoneNumber) return;
-    
-    const message = encodeURIComponent(`Check out this tip calculator: ${link}`);
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
+    const link = window.location.href.replace('#', '').split('?')[0] + allVars; // Get the current page URL
+    navigator.clipboard.writeText(link).then(() => {
+        alert('Link copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
 }
+
 
 
 function truncTo2(num, numDecimals = 2) {
