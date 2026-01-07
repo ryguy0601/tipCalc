@@ -24,15 +24,6 @@ function copyLink(getemployees = true) {
         console.error('Failed to copy: ', err);
     });
 }
-function getAllVars() {
-    let tempEmployees = []
-    for (emp of employees) {
-        tempEmployees.push(emp.slice(0, Math.min(emp.length, 8)));
-    }
-    return '?employees=' + JSON.stringify(tempEmployees);
-}
-
-
 
 function truncTo2(num, numDecimals = 2) {
     return Number(num.toString().match(new RegExp("^\\d+(\\.\\d{0," + numDecimals + "})?"))[0]);
