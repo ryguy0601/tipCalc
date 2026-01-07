@@ -19,7 +19,15 @@ function copyLink(getemployees = true) {
     let allVars = '?employees=' + JSON.stringify(tempEmployees);
     const link = window.location.href.replace('#', '').split('?')[0] + allVars; // Get the current page URL
     navigator.clipboard.writeText(link).then(() => {
-        alert('Link copied to clipboard!');
+        const copyBtn = document.getElementById('shareBtn');
+        const originalText = copyBtn.textContent;
+        copyBtn.blur();
+        copyBtn.textContent = '✓ Copied!';
+        copyBtn.style.backgroundColor = '#4CAF50';
+        setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.backgroundColor = '';
+        }, 2000);
     }).catch(err => {
         console.error('Failed to copy: ', err);
     });
