@@ -173,7 +173,8 @@ function calculateTips() {
     let bbCashPool = 0;
     let bbCCPool = 0;
     let hostTipPool = 0;
-    let serverTipPool = 0;
+    let serverCCTipPool = 0;
+    let serverCashTipPool = 0;
     let tableHTML = '';
 
     for (let emp of employees) {
@@ -193,13 +194,18 @@ function calculateTips() {
         emp.push(netSales);//emp[8]
         emp.push(cash);//emp[9] cash
         emp.push(cc);//emp[10] cc
+        emp.push(emp[6]-cc);//emp[11] server cc after barback cut
+        emp.push(emp[7]-cash);//emp[12] server cash after barback cut
+        serverCCTipPool += emp[11];
+        serverCashTipPool += emp[12];
         bbCashPool += cash;
         bbCCPool += cc;
     }
 
     for (let emp of employees.filter(emp => emp[2] === 'S')) {
         let HostCut = emp[8] * 0.01; // 1% for hosts
-        emp.push(HostCut.toFixed(0));//emp[11]
+        emp[12] -= HostCut; // deduct host cut from server cash after barback cut
+        emp.push(HostCut.toFixed(0));//emp[13] host cut
         hostTipPool += parseFloat(HostCut.toFixed(0));
     }
     sortEmployeeList()
@@ -216,10 +222,12 @@ function calculateTips() {
         //emp[8] Net Sales
         //emp[9] Barback Cut cash
         //emp[10] Barback Cut cc
-        //emp[11] Host Cut (servers only)
+        //emp[11] Server CC after barback cut
+        //emp[12] Server Cash after barback cut
+        //emp[13] Host Cut (servers only)
         // Further calculations can be added here
 
-        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[1]}</td><td>${emp[2]}</td><td>$${emp[9] || 'N/A'}</td><td>$${emp[10] || 'N/A'}</td><td>$${emp[11] || 'N/A'}</td></tr>`;
+        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[1]}</td><td>${emp[2]}</td><td>$${emp[9] || 'N/A'}</td><td>$${emp[10] || 'N/A'}</td><td>$${emp[13] || 'N/A'}</td></tr>`;
     }
     tableHTML += `<tr><td>Totals:</td><td></td><td></td><td>$${bbCashPool}</td><td>$${bbCCPool}</td><td>$${Math.round(hostTipPool)}</td></tr></tbody></table>`;
     document.getElementById('TipsCutList').innerHTML = tableHTML;
@@ -234,12 +242,78 @@ function calculateTips() {
         let bbEarningsCC = truncTo2(emp[3] * bbTipHourCC);
         emp.push(bbEarningsCash);//emp[4]
         emp.push(bbEarningsCC);//emp[5]
-
     }
-    //!give extra cents to barbacks eventually
-    // let sum = 0;
-    // for (const item of bbtipoutlst) { sum += item;}
-    // if (sum != bbTipPool) {alert(`Barback tipout mismatch: ${sum} vs ${bbTipPool}`);}
+
+    let tempBBCash = 0;
+    let tempBBCC = 0;
+    for (let emp of employees.filter(emp => emp[2] === 'b')) {
+        tempBBCash += parseFloat(emp[4] || 0);
+        tempBBCC += parseFloat(emp[5] || 0);
+    }
+    let leftoverBBCash = bbCashPool - tempBBCash;
+    let leftoverBBCC = bbCCPool - tempBBCC;
+
+    if (leftoverBBCash > 0) {
+        const barbacks = employees
+            .filter(emp => emp[2] === 'b')
+            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
+        const maxBBCash = barbacks.reduce((max, curr) =>
+            curr.emp[3] > max.emp[3] ? curr : max
+        );
+        employees[maxBBCash.index][4] = (Number(employees[maxBBCash.index][4]) + leftoverBBCash).toFixed(2);
+    }
+
+    if (leftoverBBCC > 0) {
+        const barbacks = employees
+            .filter(emp => emp[2] === 'b')
+            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
+        const maxBBCC = barbacks.reduce((max, curr) =>
+            curr.emp[3] > max.emp[3] ? curr : max
+        );
+        employees[maxBBCC.index][5] = (Number(employees[maxBBCC.index][5]) + leftoverBBCC).toFixed(2);
+    }
+
+    let serverHours = 0;
+    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) { serverHours += emp[3]; }
+    let serverTipHourCC = serverCCTipPool / serverHours;
+    let serverTipHourCash = serverCashTipPool / serverHours;
+
+    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
+        let serverEarningsCC = truncTo2(emp[3] * serverTipHourCC);
+        let serverEarningsCash = truncTo2(emp[3] * serverTipHourCash);
+        emp.push(serverEarningsCC);//emp[14]
+        emp.push(serverEarningsCash);//emp[15]
+    }
+
+    let tempServerCC = 0;
+    let tempServerCash = 0;
+    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
+        tempServerCC += parseFloat(emp[14] || 0);
+        tempServerCash += parseFloat(emp[15] || 0);
+    }
+    let leftoverServerCC = serverCCTipPool - tempServerCC;
+    let leftoverServerCash = serverCashTipPool - tempServerCash;
+
+    if (leftoverServerCC > 0) {
+        const servers = employees
+            .filter(emp => emp[2] === 'S' || emp[2] === 'B')
+            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
+        const maxServerCC = servers.reduce((max, curr) =>
+            curr.emp[3] > max.emp[3] ? curr : max
+        );
+        employees[maxServerCC.index][14] = (Number(employees[maxServerCC.index][14]) + leftoverServerCC).toFixed(2);
+    }
+
+    if (leftoverServerCash > 0) {
+        const servers = employees
+            .filter(emp => emp[2] === 'S' || emp[2] === 'B')
+            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
+        const maxServerCash = servers.reduce((max, curr) =>
+            curr.emp[3] > max.emp[3] ? curr : max
+        );
+        employees[maxServerCash.index][15] = (Number(employees[maxServerCash.index][15]) + leftoverServerCash).toFixed(2);
+    }
+
 
     let hostHours = 0;
     for (let emp of employees.filter(emp => emp[2] === 'h')) { hostHours += emp[3]; }
@@ -267,40 +341,11 @@ function calculateTips() {
         employees[maxHost.index][4] = (Number(employees[maxHost.index][4]) + leftoverHostDollars).toFixed(2);
     }
 
-    let tempBBCash = 0;
-    let tempBBCC = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'b')) {
-        tempBBCash += parseFloat(emp[4] || 0);
-        tempBBCC += parseFloat(emp[5] || 0);
-    }
-    let leftoverBBCash = bbCashPool - tempBBCash;
-    let leftoverBBCC = bbCCPool - tempBBCC;
-
-    if (leftoverBBCash > 0) {
-        const barbacks = employees
-            .filter(emp => emp[2] === 'b')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        const maxBBCash = barbacks.reduce((max, curr) =>
-            curr.emp[3] > max.emp[3] ? curr : max
-        );
-
-        employees[maxBBCash.index][4] = (Number(employees[maxBBCash.index][4]) + leftoverBBCash).toFixed(2);
-    }
-
-    if (leftoverBBCC > 0) {
-        const barbacks = employees
-            .filter(emp => emp[2] === 'b')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        const maxBBCC = barbacks.reduce((max, curr) =>
-            curr.emp[3] > max.emp[3] ? curr : max
-        );
-
-        employees[maxBBCC.index][5] = (Number(employees[maxBBCC.index][5]) + leftoverBBCC).toFixed(2);
-    }
 
 
 
-    tableHTML = '<h2 style="color: red">Still Testing</h2><br/>' + '<table><thead><tr><th>Name</th><th>Job</th><th>CC Out</th><th>Cash Out</th><th>Total</th></tr></thead><tbody>';
+
+    tableHTML = '<h2>Final Tip Out</h2><br/>' + '<table><thead><tr><th>Name</th><th>Job</th><th>CC Out</th><th>Cash Out</th><th>Total</th></tr></thead><tbody>';
 
     //tipout calc / cc cash split
     sortEmployeeList()
@@ -312,17 +357,13 @@ function calculateTips() {
 
         tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cc || 0}</td><td>$${cash}</td><td>$${totalTips}</td></tr>`;
     }
-    // for (let emp of employees.filter(emp => emp[2] === 'h')) { }
-    // for (let emp of employees.filter(emp => emp[2] === 'S')) { }
-    // for (let emp of employees.filter(emp => emp[2] === 'B')) { }
+    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
+        let cash = emp[15];
+        let cc = emp[14];
+        let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;//strupid floating point errors
+        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cc || 0}</td><td>$${cash}</td><td>$${totalTips}</td></tr>`;
+    }
 
-    // employees.forEach(emp => {//!Need to fix these numbers
-    //     let cash = Math.floor(emp[4] / 2);
-    //     let cc = (Math.trunc((parseFloat(emp[4]) - cash) * 100) / 100).toFixed(2);
-
-
-    //     console.table({ name: emp[0], netSales: emp[8], ccOut: cc, cashOut: cash });
-    // });
     tableHTML += `</tbody></table>`;
     document.getElementById('TipsOutList').innerHTML = tableHTML;
 
