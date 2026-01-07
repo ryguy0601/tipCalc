@@ -23,7 +23,6 @@ table {
 table th, table td {
     text-align: left;
 }
-.modals-body {
+/* .modals-body {
     max-height: 60vh;
-    overflow-y: auto;
-}
+} */
