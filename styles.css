@@ -1,4 +1,29 @@
 html,body{
     background-color: #222;
     color: white;
+    overflow-x: hidden;
+}
+
+table th, table td{
+    border: 1px solid #555 !important;
+}
+table tr:nth-child(even){
+    background-color: #666 !important;
+}
+table tr:nth-child(odd){
+    background-color: #444 !important;
+}
+table th{
+    background-color: #333 !important;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+table th, table td {
+    text-align: left;
+}
+.modals-body {
+    max-height: 60vh;
+    overflow-y: auto;
 }
