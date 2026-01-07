@@ -224,6 +224,37 @@
     <script src="classes.js"></script>
     <script src="frontend.js"></script>
     <script src="main.js"></script>
+    <script>
+        function getAllVars() {
+            let tempEmployees = []
+            for (emp of employees) {
+                tempEmployees.push(emp.slice(0, Math.min(emp.length, 8)));
+            }
+            return '?employees=' + JSON.stringify(tempEmployees);
+        }
+        st.copy = function () {
+            var selection;
+            selection = typeof window.getSelection === "function" ? window.location.href.replace('#', '').split('?')[0] + getAllVars() : void 0;
+            if (!selection || selection.isCollapsed) {
+                return;
+            }
+            selection = selection.toString();
+            if (selection.length > 500) {
+                selection = selection.slice(0, 497) + "...";
+            }
+            if (selection.length > 0) {
+                return st.log({
+                    copy_text: selection,
+                    destinations: "copy",
+                    event: 'share',
+                    url: st.href
+                });
+            }
+        };
+
+
+
+    </script>
 </body>
 
 </html>
