@@ -46,7 +46,7 @@ function copyLink(getemployees = true) {
 
 function truncTo2(num, numDecimals = 2) {
     const match = num.toString().match(new RegExp("^\\d+(\\.\\d{0," + numDecimals + "})?"));
-    return Number(match ? match[0] : num);
+    return parseFloat(match ? match[0] : num);
 }
 
 function sortEmployeeList() {
@@ -118,6 +118,7 @@ window.addEventListener('load', () => {
 });
 
 document.getElementById('editHoursBtn').addEventListener('click', function () {
+    sortEmployeeList()
     document.getElementById('editEmployeeTableBody').innerHTML = ''; // Clear existing rows
     employees.forEach(emp => {
         let employeeNumber = employees.indexOf(emp);
@@ -200,9 +201,10 @@ function calculateTips() {
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
         let netSales = (emp[4] - emp[5] - emp[6]).toFixed(2); // grossSales - salesTax - ccTips, rounded to 2 decimals
         let bbCut = Math.trunc((netSales * 0.04) * 100) / 100; // 4% for barbacks
+        let HostCut = 0;
         let cash = Math.floor(bbCut / 2);
         let cc = truncTo2(bbCut - cash);
-        emp.push(netSales);//emp[8]
+        emp.push(parseFloat(netSales));//emp[8]
         emp.push(cash);//emp[9] cash
         emp.push(cc);//emp[10] cc
         emp.push(emp[6] - cc);//emp[11] server cc after barback cut
@@ -211,14 +213,16 @@ function calculateTips() {
         serverCashTipPool += emp[12];
         bbCashPool += cash;
         bbCCPool += cc;
+
+        //host cut
+        if (emp[2] == 'S') {
+            HostCut = emp[8] * 0.01; // 1% for hosts(only servers)
+            emp[12] -= HostCut; // deduct host cut from server cash after barback cut
+            hostTipPool += parseFloat(HostCut.toFixed(0) || 0);
+        }
+        emp.push(HostCut.toFixed(0));//emp[13] host cut
     }
 
-    for (let emp of employees.filter(emp => emp[2] === 'S')) {
-        let HostCut = emp[8] * 0.01; // 1% for hosts
-        emp[12] -= HostCut; // deduct host cut from server cash after barback cut
-        emp.push(HostCut.toFixed(0));//emp[13] host cut
-        hostTipPool += parseFloat(HostCut.toFixed(0));
-    }
     sortEmployeeList()
     tableHTML = '<table><thead><tr><th>Name</th><th>Shift</th><th>Job</th><th>BB Cash</th><th>BB CC</th><th>Host Cash</th></tr></thead><tbody>';
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
@@ -240,7 +244,7 @@ function calculateTips() {
 
         tableHTML += `<tr><td>${emp[0]}</td><td>${emp[1]}</td><td>${emp[2]}</td><td>$${emp[9] || 'N/A'}</td><td>$${emp[10] || 'N/A'}</td><td>$${emp[13] || 'N/A'}</td></tr>`;
     }
-    tableHTML += `<tr><td>Totals:</td><td></td><td></td><td>$${bbCashPool}</td><td>$${bbCCPool}</td><td>$${Math.round(hostTipPool)}</td></tr></tbody></table>`;
+    tableHTML += `<tr><td>Totals:</td><td></td><td></td><td>$${bbCashPool}</td><td>$${truncTo2(bbCCPool)}</td><td>$${Math.round(hostTipPool)}</td></tr></tbody></table>`;
     document.getElementById('TipsCutList').innerHTML = tableHTML;
 
     let bbHours = 0;
@@ -249,7 +253,7 @@ function calculateTips() {
     let bbTipHourCC = bbCCPool / bbHours;
 
     for (let emp of employees.filter(emp => emp[2] === 'b')) {
-        let bbEarningsCash = truncTo2(emp[3] * bbTipHourCash);
+        let bbEarningsCash = truncTo2(emp[3] * bbTipHourCash, 0).toFixed(2);
         let bbEarningsCC = truncTo2(emp[3] * bbTipHourCC);
         emp.push(bbEarningsCash);//emp[4]
         emp.push(bbEarningsCC);//emp[5]
@@ -271,7 +275,7 @@ function calculateTips() {
         const maxBBCash = barbacks.reduce((max, curr) =>
             curr.emp[3] > max.emp[3] ? curr : max
         );
-        employees[maxBBCash.index][4] = (Number(employees[maxBBCash.index][4]) + leftoverBBCash).toFixed(2);
+        employees[maxBBCash.index][4] = (parseFloat(employees[maxBBCash.index][4]) + leftoverBBCash).toFixed(2);
     }
 
     if (leftoverBBCC > 0) {
@@ -281,7 +285,7 @@ function calculateTips() {
         const maxBBCC = barbacks.reduce((max, curr) =>
             curr.emp[3] > max.emp[3] ? curr : max
         );
-        employees[maxBBCC.index][5] = (Number(employees[maxBBCC.index][5]) + leftoverBBCC).toFixed(2);
+        employees[maxBBCC.index][5] = (parseFloat(employees[maxBBCC.index][5]) + leftoverBBCC).toFixed(2);
     }
 
     let serverHours = 0;
@@ -291,16 +295,16 @@ function calculateTips() {
 
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
         let serverEarningsCC = truncTo2(emp[3] * serverTipHourCC);
-        let serverEarningsCash = truncTo2(emp[3] * serverTipHourCash);
-        emp.push(serverEarningsCC);//emp[14]
-        emp.push(serverEarningsCash);//emp[15]
+        let serverEarningsCash = truncTo2(emp[3] * serverTipHourCash, 0).toFixed(2);
+        emp.push(parseFloat(serverEarningsCC));//emp[14]
+        emp.push(parseFloat(serverEarningsCash));//emp[15]
     }
 
     let tempServerCC = 0;
     let tempServerCash = 0;
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
-        tempServerCC += parseFloat(emp[14] || 0);
-        tempServerCash += parseFloat(emp[15] || 0);
+        tempServerCC += parseFloat(emp[14]) || 0;
+        tempServerCash += parseFloat(emp[15]) || 0;
     }
     let leftoverServerCC = serverCCTipPool - tempServerCC;
     let leftoverServerCash = serverCashTipPool - tempServerCash;
@@ -312,7 +316,7 @@ function calculateTips() {
         const maxServerCC = servers.reduce((max, curr) =>
             curr.emp[3] > max.emp[3] ? curr : max
         );
-        employees[maxServerCC.index][14] = (Number(employees[maxServerCC.index][14]) + leftoverServerCC).toFixed(2);
+        employees[maxServerCC.index][14] = (parseFloat(employees[maxServerCC.index][14]) + leftoverServerCC).toFixed(2);
     }
 
     if (leftoverServerCash > 0) {
@@ -322,7 +326,7 @@ function calculateTips() {
         const maxServerCash = servers.reduce((max, curr) =>
             curr.emp[3] > max.emp[3] ? curr : max
         );
-        employees[maxServerCash.index][15] = (Number(employees[maxServerCash.index][15]) + leftoverServerCash).toFixed(2);
+        employees[maxServerCash.index][15] = (parseFloat(employees[maxServerCash.index][15]) + leftoverServerCash).toFixed(2);
     }
 
 
@@ -349,7 +353,7 @@ function calculateTips() {
             curr.emp[3] > max.emp[3] ? curr : max
         );
 
-        employees[maxHost.index][4] = (Number(employees[maxHost.index][4]) + leftoverHostDollars).toFixed(2);
+        employees[maxHost.index][4] = (parseFloat(employees[maxHost.index][4]) + leftoverHostDollars).toFixed(2);
     }
 
 
@@ -360,19 +364,18 @@ function calculateTips() {
 
     //tipout calc / cc cash split
     sortEmployeeList()
-    for (let emp of employees.filter(emp => emp[2] === 'b' || emp[2] === 'h')) {
-        let cash = emp[4];
-        let cc = emp[5];
-        let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;//strupid floating point errors
-
-
-        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cc || 0}</td><td>$${cash}</td><td>$${totalTips}</td></tr>`;
-    }
-    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
-        let cash = emp[15];
-        let cc = emp[14];
-        let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;//strupid floating point errors
-        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cc || 0}</td><td>$${cash}</td><td>$${totalTips}</td></tr>`;
+    for (let emp of employees) {
+        if (emp[2] === 'b' || emp[2] === 'h') {
+            let cash = parseFloat(emp[4]);
+            let cc = parseFloat(emp[5]);
+            let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;
+            tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cc || 0}</td><td>$${cash}</td><td>$${totalTips}</td></tr>`;
+        } else if (emp[2] === 'S' || emp[2] === 'B') {
+            let cash = parseFloat(emp[15]);
+            let cc = parseFloat(emp[14]);
+            let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;
+            tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cc || 0}</td><td>$${cash}</td><td>$${totalTips}</td></tr>`;
+        }
     }
 
     tableHTML += `</tbody></table>`;
