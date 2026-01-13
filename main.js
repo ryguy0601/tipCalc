@@ -199,12 +199,19 @@ function calculateTips() {
     }
 
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
+        let cash, cc;
         let netSales = (emp[4] - emp[5] - emp[6]).toFixed(2); // grossSales - salesTax - ccTips, rounded to 2 decimals
         let bbCut = Math.trunc((netSales * 0.04) * 100) / 100; // 4% for barbacks
         let HostCut = 0;
-        let cash = Math.floor(bbCut / 2);
-        let cc = truncTo2(bbCut - cash);
         emp.push(parseFloat(netSales));//emp[8]
+
+        if (emp[7] > 0 ) {
+            cash = Math.floor(bbCut / 2);
+            cc = truncTo2(bbCut - cash);
+        } else {
+            cash = truncTo2(0);
+            cc = truncTo2(bbCut);
+        }
         emp.push(cash);//emp[9] cash
         emp.push(cc);//emp[10] cc
         emp.push(emp[6] - cc);//emp[11] server cc after barback cut
@@ -242,7 +249,7 @@ function calculateTips() {
         //emp[13] Host Cut (servers only)
         // Further calculations can be added here
 
-        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[1]}</td><td>${emp[2]}</td><td>$${emp[9] || 'N/A'}</td><td>$${emp[10] || 'N/A'}</td><td>$${emp[13] || 'N/A'}</td></tr>`;
+        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[1]}</td><td>${emp[2]}</td><td>$${emp[9]}</td><td>$${emp[10] || 'N/A'}</td><td>$${emp[13] || 'N/A'}</td></tr>`;
     }
     tableHTML += `<tr><td>Totals:</td><td></td><td></td><td>$${bbCashPool}</td><td>$${truncTo2(bbCCPool)}</td><td>$${Math.round(hostTipPool)}</td></tr></tbody></table>`;
     document.getElementById('TipsCutList').innerHTML = tableHTML;
