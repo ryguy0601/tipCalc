@@ -1,20 +1,15 @@
-//test link
-//http://127.0.0.1:5500/?employees=[["mike","Pm","B",5,1000,80,100,100],["mike1","Pm","B",5,1000,80,100,100],["mike2","Pm","B",5,1000,80,100,100]]
-//http://127.0.0.1:5500/?employees=[["mike","Pm","S",5,1000,80,100,100],["mike1","Pm","S",5,1000,80,100,100],["mike2","Pm","S",5,1000,80,100,100],["ryan","Pm","b",5],["max","Pm","b",5],["max1","Pm","b",5]]
-//http://127.0.0.1:5500/?employees=[["mike","Pm","S",5,1000,80,100,100],["mike1","Pm","S",5,1000,80,100,100],["mike2","Pm","S",5,1000,80,100,100],["ryan","Pm","b",5],["max","Pm","b",5],["max1","Pm","b",5],["host1","Pm","h",3],["host2","Pm","h",4]]
+// http://127.0.0.1:5500/?e=NrBEGMHsDtsgnUAaUAFAts0BlZBmAOgFYkBGUgJgoIA4B2JG0ggThbIAYAWAjvMriwC6SMAFkAluAAWAUwA282VgxZcSIsSR0AbNQokiNLXk0UuZPHhFgAwgEMAzrICeKzCgBCyTYZaauHSRAgiskCg5Oa1EIewBXe3csACNkHhJQCN4OLFIWAh0cm1B4F3toJJRUjRRzbKwKZl1QYoAXexd5BErQaR8UUh16oSEgA#
 
-
-
-
+const BARBACK_TIP_PERCENT = 0.04; // 4% tip out for barbacks
+const HOST_TIP_PERCENT = 0.01; // 1% tip out for hosts
 let employees = [];
-let jobTypes = { 'S': 'Server', 'B': 'Bartender', 'b': 'Barback', 'h': 'Host' }; // Server, Bartender, barback, Host
+let jobTypes = { 'S': 'Server', 'B': 'Bartender', 'b': 'Barback', 'h': 'Host' };
 
 
 window.onload = function () {
     const params = new URLSearchParams(window.location.search);
     employees = JSON.parse(LZString.decompressFromEncodedURIComponent(params.get("e")));
 }
-
 
 function copyLink(getemployees = true) {
     let tempEmployees = []
@@ -56,6 +51,89 @@ function sortEmployeeList() {
     });
 }
 
+function showTipOutInfo(tableHTML) {
+    sortEmployeeList()
+    for (let emp of employees) {
+        let cash, cc, totalTips;
+        if (emp[2] === 'b' || emp[2] === 'h') {
+            cash = parseFloat(emp[4]);
+            cc = parseFloat(emp[5]);
+            totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;
+        } else {//if (emp[2] === 'S' || emp[2] === 'B') {
+            cash = parseFloat(emp[14]);
+            cc = parseFloat(emp[15]);
+            totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;
+        }
+        tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cash}</td><td>$${cc || 0}</td><td>$${totalTips}</td></tr>`;
+    }
+    tableHTML += `</tbody></table><br/>`;
+
+    document.getElementById('TipsOutList').innerHTML += tableHTML;
+}
+
+function splitTipsEvenly(cashPool, ccPool, employeeChar) {
+    let hours = 0;
+    for (let emp of employees.filter(emp => [...employeeChar].includes(emp[2]))) { hours += emp[3]; }
+    let tipHourCash = cashPool / hours;
+    let tipHourCC = ccPool / hours;
+
+    for (let emp of employees.filter(emp => [...employeeChar].includes(emp[2]))) {
+        let earningsCash = truncTo2(emp[3] * tipHourCash, 0)//.toFixed(2);
+        let earningsCC = truncTo2(emp[3] * tipHourCC);
+        emp.push(earningsCash);//emp[4]
+        emp.push(earningsCC);//emp[5]
+    }
+}
+
+function redistributeLeftoverCC(leftoverCC, employeeLst, ccIndex) {
+    if (leftoverCC > 0) {
+
+        const splitAmount = truncTo2(leftoverCC / employeeLst.length);
+        let remainder = leftoverCC - (splitAmount * employeeLst.length);
+
+        employeeLst.forEach(({ index }) => {
+            employees[index][ccIndex] = (parseFloat(employees[index][ccIndex]) + splitAmount).toFixed(2);
+        });
+
+        if (remainder > 0) {
+            const minHoursServer = employeeLst.reduce((min, curr) =>
+                curr.emp[3] < min.emp[3] ? curr : min
+            );
+            employees[minHoursServer.index][ccIndex] = (parseFloat(employees[minHoursServer.index][ccIndex]) + remainder).toFixed(2);
+        }
+    }
+}
+
+function redistributeLeftoverCash(leftoverCash, employeeLst, cashIndex) {
+    if (leftoverCash > 0) {
+        while (leftoverCash > 0) {
+            for (emp of employeeLst) {
+                employees[emp.index][cashIndex] = (parseFloat(employees[emp.index][cashIndex]) + 1).toFixed(2);
+                leftoverCash -= 1;
+                if (leftoverCash <= 0) {
+                    return;
+                }
+            }
+
+        }
+    }
+}
+
+function redistributeLeftoverTips(employeeLst, cashTipIndex, ccTipIndex, poolCash, poolCC) {
+    let tempCash = 0;
+    let tempCC = 0;
+    for (let emp of employeeLst.map(e => e.emp)) {
+        tempCash += parseFloat(emp[cashTipIndex] || 0);
+        tempCC += parseFloat(emp[ccTipIndex] || 0);
+    }
+    let leftoverCash = poolCash - tempCash;
+    let leftoverCC = truncTo2(poolCC - tempCC);
+
+    redistributeLeftoverCC(leftoverCC, employeeLst, ccTipIndex);
+    redistributeLeftoverCash(leftoverCash, employeeLst, cashTipIndex);
+    return [leftoverCC, leftoverCash];
+}
+
 function addEmployees() {
     if (document.getElementById('addBarbackModal').classList.contains('d-none')) {
         // Server or Bartender
@@ -67,6 +145,7 @@ function addEmployees() {
         let tax = parseFloat(document.getElementById('salesTax').value);
         let ccTips = parseFloat(document.getElementById('creditTip').value);
         let cashTips = parseFloat(document.getElementById('cashTip').value);
+        name = name.charAt(0).toUpperCase() + name.slice(1);
         if ([name, shift, job, hours, sales, tax, ccTips, cashTips].includes('')) {
             alert('Please fill in all fields for the employee.');
             return false;
@@ -79,7 +158,7 @@ function addEmployees() {
         let job = document.getElementById('BarbackType').textContent.charAt(0).toLowerCase();
         let shift = document.querySelector('input[name="bbshift"]:checked').value;
         let hours = parseFloat(document.getElementById('bbHours').value);
-        let percent = job == 'b' ? 4 : 1;
+        name = name.charAt(0).toUpperCase() + name.slice(1);
         if ([name, shift, job, hours].includes('')) {
             alert('Please fill in all fields for the employee.');
             return false;
@@ -99,7 +178,6 @@ function addEmployees() {
     document.getElementById('bbHours').value = '';
     return true;
 }
-
 
 window.addEventListener('load', () => {
     const params = new URLSearchParams(window.location.search);
@@ -182,13 +260,6 @@ function editEmployee(index) {
 function calculateTips() {
     // alert('Tip calculation functionality is not yet implemented for AM/PM split.');
 
-    let bbCashPool = 0;
-    let bbCCPool = 0;
-    let hostTipPool = 0;
-    let serverCCTipPool = 0;
-    let serverCashTipPool = 0;
-    let tableHTML = '';
-
     for (let emp of employees) {
         // Reset any previous calculations
         if (emp[2] === 'S' || emp[2] === 'B') {
@@ -198,19 +269,30 @@ function calculateTips() {
         }
     }
 
+    let bbCashPool = 0;
+    let bbCCPool = 0;
+    let hostTipPool = 0;
+    let serverCCTipPool = 0;
+    let serverCashTipPool = 0;
+    let tableHTML = '';
+
+    const servers = employees.filter(emp => emp[2] === 'S' || emp[2] === 'B').map((emp) => ({ emp, index: employees.indexOf(emp) }));
+    const barbacks = employees.filter(emp => emp[2] === 'b').map((emp) => ({ emp, index: employees.indexOf(emp) }));
+    const hosts = employees.filter(emp => emp[2] === 'h').map((emp) => ({ emp, index: employees.indexOf(emp) }));
+
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
         let cash, cc;
         let netSales = (emp[4] - emp[5] - emp[6]).toFixed(2); // grossSales - salesTax - ccTips, rounded to 2 decimals
-        let bbCut = Math.trunc((netSales * 0.04) * 100) / 100; // 4% for barbacks
+        let bbCut = Math.trunc((netSales * BARBACK_TIP_PERCENT) * 100) / 100;
         // console.log('barback cut for', emp[0], ': $', bbCut);
         let HostCut = 0;
         emp.push(parseFloat(netSales));//emp[8]
 
-        if (emp[7] > 0 ) {
+        if (emp[7] > 0) {
             cash = Math.floor(bbCut / 2);
             cc = truncTo2(bbCut - cash);
-            if (cash < cc) {
-                cash+=1;
+            if (cash < truncTo2(cc, 0)) {
+                cash += 1;
                 cc = truncTo2(bbCut - cash);
             }
         } else {
@@ -228,196 +310,66 @@ function calculateTips() {
 
         //host cut
         if (emp[2] == 'S') {
-            HostCut = emp[8] * 0.01; // 1% for hosts(only servers)
+            HostCut = emp[8] * HOST_TIP_PERCENT;
             emp[12] -= HostCut; // deduct host cut from server cash after barback cut
             hostTipPool += parseFloat(HostCut.toFixed(0) || 0);
         }
         emp.push(HostCut.toFixed(0));//emp[13] host cut
     }
+    serverCCTipPool = truncTo2(serverCCTipPool);
 
     sortEmployeeList()
-    tableHTML = '<table><thead><tr><th>Name</th><th>Shift</th><th>Job</th><th>BB Cash</th><th>BB CC</th><th>Host Cash</th></tr></thead><tbody>';
+    console.log(`
+        emp[0] Name
+        emp[1] Shift
+        emp[2] Job
+        emp[3] Hours
+        emp[4] Sales
+        emp[5] Tax
+        emp[6] CC Tips
+        emp[7] Cash Tips
+        emp[8] Net Sales
+        emp[9] Barback Cut cash
+        emp[10] Barback Cut cc
+        emp[11] Server CC after barback cut
+        emp[12] Server Cash after barback cut
+        emp[13] Host Cut (servers only)
+        emp[14] Server CC Earnings
+        emp[15] Server Cash Earnings
+        type employees for a list of all employees
+        `)
+    tableHTML = '<h2>Barback & Host Cut</h2><table><thead><tr><th>Name</th><th>Shift</th><th>Job</th><th>BB Cash</th><th>BB CC</th><th>Host Cash</th></tr></thead><tbody>';
     for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
-        //emp[0] Name
-        //emp[1] Shift
-        //emp[2] Job
-        //emp[3] Hours
-        //emp[4] Sales
-        //emp[5] Tax
-        //emp[6] CC Tips
-        //emp[7] Cash Tips
-        //emp[8] Net Sales
-        //emp[9] Barback Cut cash
-        //emp[10] Barback Cut cc
-        //emp[11] Server CC after barback cut
-        //emp[12] Server Cash after barback cut
-        //emp[13] Host Cut (servers only)
-        // Further calculations can be added here
-
         tableHTML += `<tr><td>${emp[0]}</td><td>${emp[1]}</td><td>${emp[2]}</td><td>$${emp[9]}</td><td>$${emp[10] || 'N/A'}</td><td>$${emp[13] || 'N/A'}</td></tr>`;
     }
     tableHTML += `<tr><td>Totals:</td><td></td><td></td><td>$${bbCashPool}</td><td>$${truncTo2(bbCCPool)}</td><td>$${Math.round(hostTipPool)}</td></tr></tbody></table>`;
     document.getElementById('TipsCutList').innerHTML = tableHTML;
 
-    let bbHours = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'b')) { bbHours += emp[3]; }
-    let bbTipHourCash = bbCashPool / bbHours;
-    let bbTipHourCC = bbCCPool / bbHours;
+    //distribute tips
+    splitTipsEvenly(bbCashPool, bbCCPool, 'b');//barbacks
+    splitTipsEvenly(hostTipPool, 0/*no cc for hosts */, 'h');//hosts
+    splitTipsEvenly(serverCashTipPool, serverCCTipPool, 'SB');//servers and bartenders
 
-    for (let emp of employees.filter(emp => emp[2] === 'b')) {
-        let bbEarningsCash = truncTo2(emp[3] * bbTipHourCash, 0).toFixed(2);
-        let bbEarningsCC = truncTo2(emp[3] * bbTipHourCC);
-        emp.push(bbEarningsCash);//emp[4]
-        emp.push(bbEarningsCC);//emp[5]
-    }
+    tableHTML = `<h2>Tip Out</h2><p>Server pool: Cash $${serverCashTipPool}, CC $${serverCCTipPool}</p>`;
+    tableHTML += '<table><thead><tr><th>Name</th><th>Job</th><th>Cash Out</th><th>CC Out</th><th>Total</th></tr></thead><tbody>';
 
-    let tempBBCash = 0;
-    let tempBBCC = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'b')) {
-        tempBBCash += parseFloat(emp[4] || 0);
-        tempBBCC += parseFloat(emp[5] || 0);
-    }
-    let leftoverBBCash = bbCashPool - tempBBCash;
-    let leftoverBBCC = bbCCPool - tempBBCC;
+    //initial tip out view
+    showTipOutInfo(tableHTML)
 
-    if (leftoverBBCash > 0) {
-        const barbacks = employees
-            .filter(emp => emp[2] === 'b')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        const maxBBCash = barbacks.reduce((max, curr) =>
-            curr.emp[3] > max.emp[3] ? curr : max
-        );
-        employees[maxBBCash.index][4] = (parseFloat(employees[maxBBCash.index][4]) + leftoverBBCash).toFixed(2);
-    }
+    //handle leftovers
+    let [leftoverBBCC, leftoverBBCash] = redistributeLeftoverTips(barbacks, 4, 5, bbCashPool, bbCCPool);
+    let [leftoverServerCC, leftoverServerCash] = redistributeLeftoverTips(servers, 14, 15, serverCashTipPool, serverCCTipPool);
+    let [_ , leftoverHostCash] = redistributeLeftoverTips(hosts, 4, 5, hostTipPool, 0);//no cc for hosts
 
-    if (leftoverBBCC > 0) {
-        const barbacks = employees
-            .filter(emp => emp[2] === 'b')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        
-        const splitAmount = truncTo2(leftoverBBCC / barbacks.length);
-        let remainder = leftoverBBCC - (splitAmount * barbacks.length);
-        
-        barbacks.forEach(({ index }) => {
-            employees[index][5] = (parseFloat(employees[index][5]) + splitAmount).toFixed(2);
-        });
-        
-        if (remainder > 0) {
-            const minHoursBarback = barbacks.reduce((min, curr) =>
-                curr.emp[3] < min.emp[3] ? curr : min
-            );
-            employees[minHoursBarback.index][5] = (parseFloat(employees[minHoursBarback.index][5]) + remainder).toFixed(2);
-        }
-    }
+    // tableHTML += `<h2>Final Tip out</h2>`;
+    tableHTML = `<h2>Final Tip out</h2>`;
+    tableHTML += `<p>Servers: Cash: $${leftoverServerCash}, CC: $${leftoverServerCC}<br/>`;
+    tableHTML += `Barbacks: Cash: $${leftoverBBCash}, CC: $${leftoverBBCC}<br/>`;
+    tableHTML += `Hosts: Cash: $${leftoverHostCash}</p>`;
+    tableHTML += '<table><thead><tr><th>Name</th><th>Job</th><th>Cash Out</th><th>CC Out</th><th>Total</th></tr></thead><tbody>';
 
-    let serverHours = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) { serverHours += emp[3]; }
-    console.log('Server CC Tip Pool:', serverCCTipPool);
-    console.log('Server Cash Tip Pool:', serverCashTipPool);
-    let serverTipHourCC = truncTo2(serverCCTipPool / serverHours);
-    let serverTipHourCash = truncTo2(serverCashTipPool / serverHours);
-    console.log('Server Tip Hour CC:', serverTipHourCC);
-    console.log('Server Tip Hour Cash:', serverTipHourCash);
-
-    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
-        let serverEarningsCC = truncTo2(emp[3] * serverTipHourCC);
-        let serverEarningsCash = Math.round(emp[3] * serverTipHourCash);
-        emp.push(parseFloat(serverEarningsCC));//emp[14]
-        emp.push(parseFloat(serverEarningsCash));//emp[15]
-    }
-
-    let tempServerCC = 0;
-    let tempServerCash = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'S' || emp[2] === 'B')) {
-        tempServerCC += parseFloat(emp[14]) || 0;
-        tempServerCash += parseFloat(emp[15]) || 0;
-    }
-    let leftoverServerCC = serverCCTipPool - tempServerCC;
-    let leftoverServerCash = serverCashTipPool - tempServerCash;
-
-
-    if (leftoverServerCC > 0) {
-        const servers = employees
-            .filter(emp => emp[2] === 'S' || emp[2] === 'B')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        
-        const splitAmount = truncTo2(leftoverServerCC / servers.length);
-        let remainder = leftoverServerCC - (splitAmount * servers.length);
-        
-        servers.forEach(({ index }) => {
-            employees[index][14] = (parseFloat(employees[index][14]) + splitAmount).toFixed(2);
-        });
-        
-        if (remainder > 0) {
-            const minHoursServer = servers.reduce((min, curr) =>
-                curr.emp[3] < min.emp[3] ? curr : min
-            );
-            employees[minHoursServer.index][14] = (parseFloat(employees[minHoursServer.index][14]) + remainder).toFixed(2);
-        }
-    }
-
-    if (leftoverServerCash > 0) {
-        const servers = employees
-            .filter(emp => emp[2] === 'S' || emp[2] === 'B')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        const maxServerCash = servers.reduce((max, curr) =>
-            curr.emp[3] > max.emp[3] ? curr : max
-        );
-        employees[maxServerCash.index][15] = (parseFloat(employees[maxServerCash.index][15]) + leftoverServerCash).toFixed(2);
-    }
-
-
-    let hostHours = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'h')) { hostHours += emp[3]; }
-    let hostTipHour = hostTipPool / hostHours;
-
-    for (let emp of employees.filter(emp => emp[2] === 'h')) {
-        let hostEarnings = truncTo2(emp[3] * hostTipHour, 0);
-        emp.push(hostEarnings.toFixed(2));//emp[4]
-    }
-
-    let tempHosttips = 0;
-    for (let emp of employees.filter(emp => emp[2] === 'h')) {
-        tempHosttips += parseFloat(emp[4]);
-    }
-    let leftoverHostDollars = hostTipPool - tempHosttips;
-
-    if (leftoverHostDollars > 0) {
-        const hosts = employees
-            .filter(emp => emp[2] === 'h')
-            .map((emp) => ({ emp, index: employees.indexOf(emp) }));
-        const maxHost = hosts.reduce((max, curr) =>
-            curr.emp[3] > max.emp[3] ? curr : max
-        );
-
-        employees[maxHost.index][4] = (parseFloat(employees[maxHost.index][4]) + leftoverHostDollars).toFixed(2);
-    }
-
-
-
-
-
-    tableHTML = '<h2>Final Tip Out</h2><br/>' + '<table><thead><tr><th>Name</th><th>Job</th><th>Cash Out</th><th>CC Out</th><th>Total</th></tr></thead><tbody>';
-
-    //tipout calc / cc cash split
-    sortEmployeeList()
-    for (let emp of employees) {
-        if (emp[2] === 'b' || emp[2] === 'h') {
-            let cash = parseFloat(emp[4]);
-            let cc = parseFloat(emp[5]);
-            let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;
-            tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cash}</td><td>$${cc || 0}</td><td>$${totalTips}</td></tr>`;
-        } else if (emp[2] === 'S' || emp[2] === 'B') {
-            let cash = parseFloat(emp[15]);
-            let cc = parseFloat(emp[14]);
-            let totalTips = ((cc || 0) * 100 + (cash * 100)) / 100;
-            tableHTML += `<tr><td>${emp[0]}</td><td>${emp[2]}</td><td>$${cash}</td><td>$${cc || 0}</td><td>$${totalTips}</td></tr>`;
-        }
-    }
-
-    tableHTML += `</tbody></table>`;
-    document.getElementById('TipsOutList').innerHTML = tableHTML;
-
+    //final tip out view
+    showTipOutInfo(tableHTML)
 
 }
 
