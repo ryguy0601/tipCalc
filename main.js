@@ -107,10 +107,10 @@ function redistributeLeftoverCC(leftoverCC, employeeLst, ccIndex) {
 function redistributeLeftoverCash(leftoverCash, employeeLst, cashIndex) {
     while (leftoverCash > 0 && employeeLst.length > 0) {
         // console.log('Leftover cash to distribute: $', leftoverCash);
-        for (emp of employeeLst) {
-            if (leftoverCash <= 0) {
-                return;
-            }
+            for (emp of employeeLst) {
+                if (leftoverCash <= 0) {
+                    return;
+                }
             employees[emp.index][cashIndex] = (parseFloat(employees[emp.index][cashIndex]) + 1).toFixed(2);
             leftoverCash -= 1;
             // console.log('Distributing $1 to', employees[emp.index][0], ', leftover now: $', leftoverCash);
@@ -257,6 +257,7 @@ function editEmployee(index) {
 }
 
 function calculateTips() {
+    document.getElementById('TipsOutList').innerHTML = "";
     // alert('Tip calculation functionality is not yet implemented for AM/PM split.');
 
     for (let emp of employees) {
