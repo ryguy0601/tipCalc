@@ -105,16 +105,15 @@ function redistributeLeftoverCC(leftoverCC, employeeLst, ccIndex) {
 }
 
 function redistributeLeftoverCash(leftoverCash, employeeLst, cashIndex) {
-    if (leftoverCash > 0) {
-        while (leftoverCash > 0) {
-            for (emp of employeeLst) {
-                employees[emp.index][cashIndex] = (parseFloat(employees[emp.index][cashIndex]) + 1).toFixed(2);
-                leftoverCash -= 1;
-                if (leftoverCash <= 0) {
-                    return;
-                }
+    while (leftoverCash > 0 && employeeLst.length > 0) {
+        // console.log('Leftover cash to distribute: $', leftoverCash);
+        for (emp of employeeLst) {
+            if (leftoverCash <= 0) {
+                return;
             }
-
+            employees[emp.index][cashIndex] = (parseFloat(employees[emp.index][cashIndex]) + 1).toFixed(2);
+            leftoverCash -= 1;
+            // console.log('Distributing $1 to', employees[emp.index][0], ', leftover now: $', leftoverCash);
         }
     }
 }
